@@ -8,7 +8,7 @@ from ofxstatement_bkk.plugin import BkkPlugin
 def test_sample() -> None:
     plugin = BkkPlugin(UI(), {})
     here = os.path.dirname(__file__)
-    sample_filename = os.path.join(here, "sample-statement.csv")
+    sample_filename = os.path.join(here, "bkk-statement.csv")
 
     parser = plugin.get_parser(sample_filename)
     statement = parser.parse()
