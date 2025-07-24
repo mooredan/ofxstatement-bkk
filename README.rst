@@ -1,5 +1,5 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Sample plugin for ofxstatement
+Bangkok Bank plugin for ofxstatement
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This project provides a boilerplate for custom plugins for ofxstatement.
@@ -16,44 +16,14 @@ Users of ofxstatement have developed several plugins for their banks. They are
 listed on main `ofxstatement`_ site. If your bank is missing, you can develop
 your own plugin.
 
-Setting up development environment
-==================================
-
-It is recommended to use ``pipenv`` to make a clean development environment.
-Setting up dev environment for writing a plugin is easy::
-
-  $ git clone https://github.com/kedder/ofxstatement-sample ofxstatement-yourbank
-  $ cd ofxstatement-yourbank
-  $ pipenv sync --dev
-  $ pipenv shell
-
-This will download all the dependencies and install them into your virtual
-environment. After this, you should be able to do::
-
-  $ ofxstatement list-plugins
-  The following plugins are available:
-
-    sample           Sample plugin (for developers only)
-
-
-
-Your own plugin
-===============
-
-To create your own plugin, follow these steps:
-
 * Edit ``pyproject.toml`` and provide relevant metadata for your plugin.  Pay close
   attention to ``project.entry-points`` section: it lists plugins you are registering
   within ofxstatement. Give meaningful name to the plugin and reference your plugin
   class name.
 * Replace contents of ``README.rst`` with description of your plugin
-* Rename the project name (``ofxstatement_sample``) to match plugin package name you
-  have provided in ``entry_points`` parameter.
-* Open the ``plugin.py`` and rename ``SamplePlugin`` and ``SampleParser``
-  classes to match your plugin class name.
 * Now, draw the rest of the owl (c).
 
-.. _ofxstatement-sample: https://github.com/kedder/ofxstatement-sample
+.. _ofxstatement-bkk: https://github.com/mooredan/ofxstatement-bkk
 
 Your ``StatementParser`` is the main object that does all the hard work. It
 has only one public method: ``parse()``, that should return

@@ -29,7 +29,7 @@
             "index": "pypi",
             "version": "==0.9.1"
         },
-        "ofxstatement-sample": {
+        "ofxstatement-bkk": {
             "editable": true,
             "path": "."
         },
