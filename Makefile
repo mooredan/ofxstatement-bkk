@@ -6,11 +6,11 @@ test:
 
 PHONY: coverage
 coverage: bin/pytest
-	pytest --cov src/ofxstatement
+	pytest --cov src/ofxstatement-bkk
 
 .PHONY: black
 black:
-	black setup.py src tests
+	black src tests
 
 .PHONY: mypy
 mypy:

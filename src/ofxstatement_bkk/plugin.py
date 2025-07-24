@@ -38,26 +38,9 @@ class BkkParser(AbstractStatementParser):
         self.statement.currency = "THB"
         self.id_generator = IdGenerator()
 
-    def parse_datetime(self, value: str) -> datetime:
-        return datetime.strptime(value, self.date_format)
-
     def parse_decimal(self, value: str) -> D:
         # some plugins pass localised numbers, clean them up
         return D(value.replace(",", "").replace(" ", ""))
-
-
-    def parse_value(self, value: Optional[str], field: str) -> Any:
-        tp = StatementLine.__annotations__.get(field)
-        if value is None:
-            return None
-
-        if tp in (datetime, Optional[datetime]):
-            return self.parse_datetime(value)
-        elif tp in (Decimal, Optional[Decimal]):
-            return self.parse_decimal(value)
-        else:
-            return value
-
 
     def parse_record(self, line):
         """Parse given transaction line and return StatementLine object"""
@@ -101,13 +84,12 @@ class BkkParser(AbstractStatementParser):
         if line[3]:
             rawvalue = line[3]
             value = self.parse_decimal(rawvalue)
-            value = -value;
+            value = -value
             setattr(stmt_line, field, value)
         if line[4]:
             rawvalue = line[4]
             value = self.parse_decimal(rawvalue)
             setattr(stmt_line, field, value)
-
 
         # date
         date = datetime.strptime(line[1][0:16], "%d %b %Y %H:%M")
@@ -117,15 +99,15 @@ class BkkParser(AbstractStatementParser):
 
         # trntype
         stmt_line.trntype = "UNKNOWN"
-         
+
         match_result = re.match(r"^Payment for Goods /Services", line[2])
         if match_result and line[6] == "MOB":
             stmt_line.trntype = "PAYMENT"
-      
+
         match_result = re.match(r"^Purchase via e-Channels", line[2])
         if match_result and line[6] == "E-CHN":
             stmt_line.trntype = "PAYMENT"
-      
+
         match_result = re.match(r"^Cash Withdrawal - .* ATM", line[2])
         if match_result and line[6] == "ATM":
             stmt_line.trntype = "ATM"
@@ -148,7 +130,6 @@ class BkkParser(AbstractStatementParser):
 
         return stmt_line
 
-
     # parse the CSV file and return a Statement
     def parse(self) -> Statement:
         """Main entry point for parsers"""
@@ -169,7 +150,10 @@ class BkkParser(AbstractStatementParser):
                     self.statement.account_id = csv_line[1]
                     continue
 
-                if csv_line[0] == "Account Nickname" and csv_line[2] == "Ledger Balance":
+                if (
+                    csv_line[0] == "Account Nickname"
+                    and csv_line[2] == "Ledger Balance"
+                ):
                     self.statement.account_id = csv_line[1]
                     rawvalue = csv_line[3]
                     value = self.parse_decimal(rawvalue)
@@ -184,7 +168,6 @@ class BkkParser(AbstractStatementParser):
                     stmt_line.assert_valid()
                     self.statement.lines.append(stmt_line)
                     # print(f"{stmt_line}")
-
 
             # this is a Savings account
             self.statement.account_type = "SAVINGS"
@@ -212,6 +195,7 @@ class BkkParser(AbstractStatementParser):
             # print(f"{self.statement}")
             return self.statement
 
+
 class IdGenerator:
     """Generates a unique ID based on the date
 
@@ -229,5 +213,4 @@ class IdGenerator:
     def create_id(self, date) -> str:
         date_str = datetime.strftime(date, "%Y%m%d")
         self.date_count[date_str] = self.date_count.get(date_str, 0) + 1
-        return f'{date_str}-{self.date_count[date_str]}'
-
+        return f"{date_str}-{self.date_count[date_str]}"
