@@ -124,6 +124,11 @@ class BkkParser(AbstractStatementParser):
         if match_result and line[6] == "MOB":
             stmt_line.trntype = "XFER"
 
+        match_result = re.match(r"^Interbank Transfer", line[2])
+        if match_result and line[6] == "MOB":
+            stmt_line.trntype = "XFER"
+
+        match_result = re.match(r"^PromptPay Transfer/Top Up", line[2])
         match_result = re.match(r"^PromptPay Transfer/Top Up", line[2])
         if match_result and line[6] == "MOB":
             stmt_line.trntype = "PAYMENT"
