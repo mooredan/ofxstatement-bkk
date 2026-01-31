@@ -4,25 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ofxstatement-bkk"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
-  { name="Andrey Lebedev", email="andrey@lebedev.lt" },
   { name="Dan Moore", email="dan@suncup.net" },
 ]
-description = "Bangkok Bank plugin for ofxstatement"
-readme = "README.rst"
+description = "ofxstatement plugin for Bangkok Bank CSV exports"
+readme = "README.md"
 requires-python = ">=3.9"
+license-files = ["LICENSE.txt"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
     "Natural Language :: English",
     "Topic :: Office/Business :: Financial :: Accounting",
     "Topic :: Utilities",
     "Environment :: Console",
     "Operating System :: OS Independent",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
 ]
-keywords = ["ofx", "banking", "statement", "plugin", "bangkok", "ofxstatement"]
+keywords = ["ofx", "banking", "statement", "plugin", "ofxstatement", "bangkok", "csv"]
 dependencies = [
   "ofxstatement",
 ]
@@ -30,5 +29,44 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/mooredan/ofxstatement-bkk/"
 
+# --- Entry Points ---
+# This registers your plugin so ofxstatement can find it
 [project.entry-points."ofxstatement"]
 bkk = "ofxstatement_bkk.plugin:BkkPlugin"
+
+# --- Optional Dependencies (Dev Tools) ---
+# Allows you to run: pip install -e .[dev]
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "mypy",
+    "build",
+    "twine",
+]
+
+# --- Tool Configurations ---
+
+# Explicitly tell setuptools where your code lives
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "DEBUG"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+
+[tool.mypy]
+files = ["src", "tests"]
+warn_unused_configs = true
+# This prevents mypy from crashing if ofxstatement doesn't have type hints
+ignore_missing_imports = true

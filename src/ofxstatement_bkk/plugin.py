@@ -1,35 +1,22 @@
-import sys
-
-from os import path
-
-from decimal import Decimal, Decimal as D
-from datetime import datetime
+import csv
 import re
-from typing import Dict, Optional, Any, Iterable, List, TextIO, TypeVar, Generic
+from decimal import Decimal
+from datetime import datetime
+from typing import Optional, List, TextIO
 
 from ofxstatement.plugin import Plugin
-from ofxstatement.parser import StatementParser
-
 from ofxstatement.parser import AbstractStatementParser
 from ofxstatement.statement import Statement, StatementLine
 
-import csv
-
 
 class BkkPlugin(Plugin):
-    """Sample plugin (for developers only)"""
+    """Bangkok Bank (BKK) plugin for ofxstatement"""
 
     def get_parser(self, filename: str) -> "BkkParser":
-        parser = BkkParser(filename)
-        return parser
+        return BkkParser(filename)
 
 
 class BkkParser(AbstractStatementParser):
-    statement: Statement
-    fin: TextIO  # file input stream
-
-    cur_record: int = 0
-
     def __init__(self, filename: str) -> None:
         super().__init__()
         self.filename = filename
@@ -38,184 +25,147 @@ class BkkParser(AbstractStatementParser):
         self.statement.currency = "THB"
         self.id_generator = IdGenerator()
 
-    def parse_decimal(self, value: str) -> D:
-        # some plugins pass localised numbers, clean them up
-        return D(value.replace(",", "").replace(" ", ""))
+    def parse_decimal(self, value: str) -> Decimal:
+        """Parse localised numbers, cleaning up commas and spaces."""
+        return Decimal(value.replace(",", "").replace(" ", ""))
 
-    def parse_record(self, line):
+    def parse_record(self, line: List[str]) -> Optional[StatementLine]:
         """Parse given transaction line and return StatementLine object"""
+        # CSV Structure:
+        # [0]: (Space or Header)
+        # [1]: Date
+        # [2]: Description
+        # [3]: Debit
+        # [4]: Credit
+        # [5]: Balance
+        # [6]: Channel
+        # [7]: (Blank)
+
+        # Basic validation
+        if len(line) != 8:
+            return None
+
+        # Skip blank lines or lines that don't start with the expected spacer
+        if not line[0] or line[0] != " " or line[7] != "":
+            return None
 
         stmt_line = StatementLine()
-
-        # line[0 ] : ,
-        # line[1 ] : Date,
-        # line[2 ] : Description,
-        # line[3 ] : Debit,
-        # line[4 ] : Credit,
-        # line[5 ] : Balance,
-        # line[6 ] : Channel,
-        # line[7 ] : ,
-
-        # msg = f"self.cur_record: {self.cur_record}"
-        # print(msg, file=sys.stderr)
-
-        # there must be exactly 8 fields
-        line_length = len(line)
-        if line_length != 8:
-            return None
-
-        # skip blank lines
-        if not line[0]:
-            return None
-
-        # first field must be one space
-        if not line[0] == " ":
-            return None
-
-        # last field must be blank
-        if not line[7] == "":
-            return None
-
-        # memo
         stmt_line.memo = line[2]
 
-        # amount
-        field = "amount"
-        if line[3]:
-            rawvalue = line[3]
-            value = self.parse_decimal(rawvalue)
-            value = -value
-            setattr(stmt_line, field, value)
-        if line[4]:
-            rawvalue = line[4]
-            value = self.parse_decimal(rawvalue)
-            setattr(stmt_line, field, value)
+        # Amount parsing
+        if line[3]:  # Debit
+            stmt_line.amount = -self.parse_decimal(line[3])
+        elif line[4]:  # Credit
+            stmt_line.amount = self.parse_decimal(line[4])
+        else:
+            stmt_line.amount = Decimal(0)
 
-        # date
-        date = datetime.strptime(line[1][0:16], "%d %b %Y %H:%M")
-        stmt_line.date = date
-        id = self.id_generator.create_id(date)
-        stmt_line.id = id
+        # Date parsing
+        # Format: "dd MMM yyyy HH:mm"
+        try:
+            stmt_line.date = datetime.strptime(line[1][0:16], "%d %b %Y %H:%M")
+        except ValueError:
+            return None
 
-        # trntype
+        # Transaction Type Classification
+        channel = line[6]
+        memo = line[2]
+
         stmt_line.trntype = "UNKNOWN"
 
-        match_result = re.match(r"^Payment for Goods /Services", line[2])
-        if match_result and line[6] == "MOB":
-            stmt_line.trntype = "PAYMENT"
+        if channel == "MOB":
+            if memo.startswith("Payment for Goods /Services"):
+                stmt_line.trntype = "PAYMENT"
+            elif memo.startswith("Transfer") or memo.startswith("Interbank Transfer"):
+                stmt_line.trntype = "XFER"
+            elif memo.startswith("PromptPay Transfer/Top Up"):
+                stmt_line.trntype = "PAYMENT"
 
-        match_result = re.match(r"^Purchase via e-Channels", line[2])
-        if match_result and line[6] == "E-CHN":
-            stmt_line.trntype = "PAYMENT"
+        elif channel == "E-CHN":
+            if memo.startswith("Purchase via e-Channels"):
+                stmt_line.trntype = "PAYMENT"
 
-        match_result = re.match(r"^Cash Withdrawal - .* ATM", line[2])
-        if match_result and line[6] == "ATM":
-            stmt_line.trntype = "ATM"
+        elif channel == "ATM":
+            if memo.startswith("Cash Withdrawal"):
+                stmt_line.trntype = "ATM"
 
-        match_result = re.match(r"^International Transfer", line[2])
-        if match_result and line[6] == "User":
-            stmt_line.trntype = "XFER"
+        elif channel == "User":
+            if memo.startswith("International Transfer"):
+                stmt_line.trntype = "XFER"
 
-        match_result = re.match(r"^Commission/Annual Fee", line[2])
-        if match_result and line[6] == "AUTO":
-            stmt_line.trntype = "FEE"
-
-        match_result = re.match(r"^Transfer", line[2])
-        if match_result and line[6] == "MOB":
-            stmt_line.trntype = "XFER"
-
-        match_result = re.match(r"^Interbank Transfer", line[2])
-        if match_result and line[6] == "MOB":
-            stmt_line.trntype = "XFER"
-
-        match_result = re.match(r"^PromptPay Transfer/Top Up", line[2])
-        match_result = re.match(r"^PromptPay Transfer/Top Up", line[2])
-        if match_result and line[6] == "MOB":
-            stmt_line.trntype = "PAYMENT"
+        elif channel == "AUTO":
+            if memo.startswith("Commission/Annual Fee"):
+                stmt_line.trntype = "FEE"
 
         return stmt_line
 
-    # parse the CSV file and return a Statement
     def parse(self) -> Statement:
         """Main entry point for parsers"""
-        with open(self.filename, "r") as fin:
+        with open(self.filename, "r", encoding="utf-8") as fin:
+            reader = csv.reader(fin)
 
-            self.fin = fin
-            reader = csv.reader(self.fin)
-
-            # loop through the CSV file lines
             for csv_line in reader:
-                # print(f"{csv_line}")
-                self.cur_record += 1
-
                 if not csv_line:
                     continue
 
+                # Handle Metadata Headers
                 if csv_line[0] == "Account Number":
-                    self.statement.account_id = csv_line[1]
+                    if len(csv_line) > 1:
+                        self.statement.account_id = csv_line[1]
                     continue
 
                 if (
                     csv_line[0] == "Account Nickname"
+                    and len(csv_line) > 3
                     and csv_line[2] == "Ledger Balance"
                 ):
+                    # Redundant if Account Number was found, but safe
                     self.statement.account_id = csv_line[1]
-                    rawvalue = csv_line[3]
-                    value = self.parse_decimal(rawvalue)
-                    self.statement.end_balance = value
+                    self.statement.end_balance = self.parse_decimal(csv_line[3])
                     continue
 
-                if not csv_line[0] == " ":
-                    continue
-
+                # Parse Transactions
                 stmt_line = self.parse_record(csv_line)
                 if stmt_line:
-                    stmt_line.assert_valid()
+                    # NOTE: We cannot call assert_valid() here yet because
+                    # the ID hasn't been generated. We do that after the loop.
                     self.statement.lines.append(stmt_line)
-                    # print(f"{stmt_line}")
 
-            # this is a Savings account
-            self.statement.account_type = "SAVINGS"
+        self.statement.account_type = "SAVINGS"
 
-            # reverse the lines
-            self.statement.lines.reverse()
+        # Reverse lines to ensure chronological order (Oldest -> Newest)
+        self.statement.lines.reverse()
 
-            # reset the date count in the id generator
-            self.id_generator.reset()
+        # Generate IDs sequentially AND Validate
+        self.id_generator.reset()
+        for line in self.statement.lines:
+            if line.date:  # <--- Added check to satisfy mypy
+                line.id = self.id_generator.create_id(line.date)
 
-            # after reversing the lines in the list, update the id
-            for line in self.statement.lines:
-                date = line.date
-                new_id = self.id_generator.create_id(date)
-                line.id = new_id
+            # Now that ID is set, we can safely validate
+            line.assert_valid()
 
-            # figure out start_date and end_date for the statement
+        if self.statement.lines:
             self.statement.start_date = min(
-                sl.date for sl in self.statement.lines if sl.date is not None
+                sl.date for sl in self.statement.lines if sl.date
             )
             self.statement.end_date = max(
-                sl.date for sl in self.statement.lines if sl.date is not None
+                sl.date for sl in self.statement.lines if sl.date
             )
 
-            # print(f"{self.statement}")
-            return self.statement
+        return self.statement
 
 
 class IdGenerator:
-    """Generates a unique ID based on the date
-
-    Hopefully any JSON file that we get will have all the transactions for a
-    given date, and hopefully in the same order each time so that these IDs
-    will match up across exports.
-    """
+    """Generates unique IDs based on the date and sequence"""
 
     def __init__(self) -> None:
-        self.date_count: Dict[str, int] = {}
+        self.date_count: dict[str, int] = {}
 
     def reset(self) -> None:
         self.date_count.clear()
 
-    def create_id(self, date) -> str:
-        date_str = datetime.strftime(date, "%Y%m%d")
+    def create_id(self, date: datetime) -> str:
+        date_str = date.strftime("%Y%m%d")
         self.date_count[date_str] = self.date_count.get(date_str, 0) + 1
         return f"{date_str}-{self.date_count[date_str]}"
