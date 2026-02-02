@@ -96,6 +96,8 @@ class BkkParser(AbstractStatementParser):
         elif channel == "AUTO":
             if memo.startswith("Commission/Annual Fee"):
                 stmt_line.trntype = "FEE"
+            if memo.startswith("International Transfer"):
+                stmt_line.trntype = "XFER"
 
         return stmt_line
 
