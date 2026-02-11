@@ -81,6 +81,10 @@ class BkkParser(AbstractStatementParser):
             elif memo.startswith("PromptPay Transfer/Top Up"):
                 stmt_line.trntype = "PAYMENT"
 
+        elif channel == "IB":
+            if memo.startswith("Payment for Goods /Services"):
+                stmt_line.trntype = "PAYMENT"
+
         elif channel == "E-CHN":
             if memo.startswith("Purchase via e-Channels"):
                 stmt_line.trntype = "PAYMENT"
